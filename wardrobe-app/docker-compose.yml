@@ -1,0 +1,64 @@
+services:
+  # 1. База данных (Локальная для этого деплоя)
+  db:
+    image: postgres:17-alpine
+    container_name: wardrobe-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: wardrobe_db
+    ports:
+      - "5433:5432" # Внешний порт 5433, внутренний 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. ML Сервис
+  ml-service:
+    build: ./image-processing-service
+    container_name: wardrobe-ml
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - u2net_cache:/root/.u2net
+
+  # 3. Backend (.NET)
+  backend:
+    build: ./WardrobeApp/WardrobeApp
+    container_name: wardrobe-backend
+    restart: always
+    depends_on:
+      - db
+      - ml-service
+    environment:
+      # Подключение к БД внутри докера (хост = db)
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=wardrobe_db;Username=user;Password=password"
+      # Ссылка на ML сервис по имени контейнера
+      ML_SERVICE_URL: "http://ml-service:8000"
+      # Настройки JWT (можно скопировать свои)
+      JwtSettings__SecretKey: "THIS_IS_A_VERY_LONG_SECRET_KEY_FOR_TESTING_PURPOSES"
+      JwtSettings__Issuer: "WardrobeApp"
+      JwtSettings__Audience: "WardrobeAppClient"
+      JwtSettings__AccessTokenExpirationMinutes: "60"
+      JwtSettings__RefreshTokenExpirationDays: "7"
+      ASPNETCORE_URLS: "http://+:8080"
+    ports:
+      - "5202:8080"
+    volumes:
+      # Сохраняем картинки на диск хоста
+      - ./WardrobeApp/wwwroot/images:/app/wwwroot/images
+
+  # 4. Frontend (Vue)
+  frontend:
+    build: ./wardrobe-frontend
+    container_name: wardrobe-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  postgres_data:
+  u2net_cache:

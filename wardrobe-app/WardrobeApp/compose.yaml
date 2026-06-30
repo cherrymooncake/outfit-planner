@@ -1,0 +1,16 @@
+﻿services:
+  db:
+    image: postgres:17.5
+    container_name: wardrobe_db_container
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: wardrobe_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
